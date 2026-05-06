@@ -60,7 +60,7 @@ export default function CoachSession({ params: paramsPromise }) {
   useEffect(() => {
     const fetchSession = async () => {
       try {
-        const res = await api.get(`/coach/${id}`);
+        const res = await api.get(`/english/coach/${id}`);
         setSession(res.data);
         // Speak the first message
         if (res.data.messages.length === 1) {
@@ -130,7 +130,7 @@ export default function CoachSession({ params: paramsPromise }) {
 
     try {
       const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/coach/message-stream`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/english/coach/message-stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ sessionId: id, message: text })
@@ -185,39 +185,59 @@ export default function CoachSession({ params: paramsPromise }) {
 
       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0">
         <VideoPlayer videoRef={videoRef} error={mediaError} />
-        <AvatarPlayer videoUrl={videoUrl} isGenerating={isGenerating} isFallbackSpeaking={isAISpeaking} />
+        <div className="bg-card border border-border rounded-2xl flex flex-col overflow-hidden relative">
+          <div className="flex-1 overflow-y-auto p-4 custom-scrollbar flex flex-col gap-3">
+             {session.messages.map((msg, i) => (
+               <div key={i} className={`max-w-[85%] p-3 rounded-2xl ${
+                 msg.role === 'ai' ? 'bg-primary/10 self-start text-sm' : 'bg-foreground/5 self-end text-sm border border-border/50'
+               }`}>
+                 {msg.role === 'ai' ? (
+                    <div className="space-y-2">
+                       {msg.content.split('\n').map((line, j) => (
+                         <p key={j} className={
+                           line.includes('Correction:') ? 'font-bold text-primary' : 
+                           line.includes('Better Version:') ? 'italic text-foreground/80' : ''
+                         }>{line}</p>
+                       ))}
+                    </div>
+                 ) : msg.content}
+               </div>
+             ))}
+          </div>
+          <AvatarPlayer videoUrl={videoUrl} isGenerating={isGenerating} isFallbackSpeaking={isAISpeaking} />
+        </div>
       </div>
 
       {/* Real-time Feedback Section */}
-      <div className="h-32 mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-background/50 border border-border rounded-2xl p-4 flex flex-col justify-center">
-          <p className="text-xs font-bold text-foreground/40 mb-1 uppercase tracking-wider">Your Speech</p>
-          <p className="text-sm italic">{transcript || "Listening for your voice..."}</p>
+          <p className="text-[10px] font-bold text-foreground/40 mb-1 uppercase tracking-wider">Live Transcript</p>
+          <p className="text-sm italic line-clamp-2">{transcript || "Listening..."}</p>
         </div>
         
-        <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex flex-col justify-center relative overflow-hidden">
+        <div className="md:col-span-2 bg-primary/5 border border-primary/20 rounded-2xl p-4 flex flex-col justify-center relative overflow-hidden">
           {lastCorrection ? (
-            <>
-              <div className="flex items-start gap-3">
+            <div className="flex items-start gap-3">
                 {lastCorrection.isCorrect ? (
                   <CheckCircle2 className="text-green-500 shrink-0 mt-0.5" size={18} />
                 ) : (
                   <AlertCircle className="text-primary shrink-0 mt-0.5" size={18} />
                 )}
-                <div>
-                  <p className="text-xs font-bold text-primary mb-1 uppercase tracking-wider">Coach Correction</p>
-                  <p className="text-sm font-medium">{lastCorrection.isCorrect ? "Perfect! Well said." : lastCorrection.corrected}</p>
-                  {lastCorrection.explanation && <p className="text-[10px] text-foreground/60 mt-1">{lastCorrection.explanation}</p>}
+                <div className="flex-1">
+                  <div className="flex justify-between items-center mb-1">
+                    <p className="text-[10px] font-bold text-primary uppercase tracking-wider">Teacher Correction</p>
+                    <span className="bg-primary/20 text-primary text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      Score: {lastCorrection.fluencyScore}/10
+                    </span>
+                  </div>
+                  <p className="text-sm font-medium">{lastCorrection.isCorrect ? "Perfectly said!" : lastCorrection.corrected}</p>
+                  {lastCorrection.explanation && <p className="text-[10px] text-foreground/60 mt-1 italic">"{lastCorrection.explanation}"</p>}
                 </div>
-              </div>
-              <div className="absolute top-2 right-2 bg-primary/20 text-primary text-[10px] font-bold px-2 py-0.5 rounded-full">
-                Score: {lastCorrection.fluencyScore}/10
-              </div>
-            </>
+            </div>
           ) : (
             <div className="flex items-center gap-2 text-foreground/40 text-sm">
-              <MessageSquare size={16} />
-              <span>Feedback will appear here...</span>
+              <Sparkles size={16} className="animate-pulse" />
+              <span>Teacher is listening for your pronunciation...</span>
             </div>
           )}
         </div>

@@ -8,8 +8,7 @@ const connectDB = require('./config/db');
 
 const authRoutes = require('./routes/authRoutes');
 const interviewRoutes = require('./routes/interviewRoutes');
-const coachRoutes = require('./routes/coachRoutes');
-const lessonRoutes = require('./routes/lessonRoutes');
+const englishRoutes = require('./routes/englishRoutes');
 
 const app = express();
 
@@ -28,8 +27,7 @@ const limiter = rateLimit({
 
 app.use('/auth', limiter, authRoutes);
 app.use('/interview', limiter, interviewRoutes);
-app.use('/coach', limiter, coachRoutes);
-app.use('/lesson', limiter, lessonRoutes);
+app.use('/english', limiter, englishRoutes);
 
 app.get('/', (req, res) => {
   res.send('InterviewAI Backend API Running');

@@ -21,8 +21,8 @@ export default function LessonLibrary() {
   const fetchData = async () => {
     try {
       const [lessonsRes, progressRes] = await Promise.all([
-        api.get('/lesson'),
-        api.get('/lesson/progress')
+        api.get('/english/lessons'),
+        api.get('/english/lessons/progress')
       ]);
       setLessons(lessonsRes.data);
       setProgress(progressRes.data);
@@ -56,7 +56,7 @@ export default function LessonLibrary() {
   const handleGenerate = async (level, topic) => {
     setCreating(true);
     try {
-      const res = await api.post('/lesson/generate', { level, topic });
+      const res = await api.post('/english/lessons/generate', { level, topic });
       router.push(`/coach/lesson/${res.data._id}`);
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to generate lesson';

@@ -17,13 +17,12 @@ export default function LessonDetail({ params: paramsPromise }) {
   const [processing, setProcessing] = useState(false);
   const [lastCorrection, setLastCorrection] = useState(null);
 
-  const { stream, videoRef, error: mediaError } = useMediaStream();
   const { isRecording, startRecording, stopRecording, transcript, setTranscript } = useSpeechRecognition();
 
   useEffect(() => {
     const fetchLesson = async () => {
       try {
-        const res = await api.get(`/lesson`);
+        const res = await api.get(`/english/lessons`);
         const found = res.data.find(l => l._id === id);
         setLesson(found);
       } catch (err) {
@@ -34,6 +33,16 @@ export default function LessonDetail({ params: paramsPromise }) {
     };
     fetchLesson();
   }, [id]);
+
+  useEffect(() => {
+    if (lesson && !loading) {
+      // Auto-play teacher intro
+      const timer = setTimeout(() => {
+        speakText(lesson.voiceIntro || lesson.explanation);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [lesson, loading]);
 
   const speakText = (text) => {
     window.speechSynthesis.cancel();
@@ -54,12 +63,12 @@ export default function LessonDetail({ params: paramsPromise }) {
 
     try {
       const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/coach/message-stream`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/english/coach/message-stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ 
           message: text,
-          context: `Lesson Topic: ${lesson.topic}, Lesson Title: ${lesson.title}`
+          context: `Lesson Topic: ${lesson.topic}, Lesson Title: ${lesson.title}. Current Task: ${lesson.practice[0]}`
         })
       });
 
@@ -82,8 +91,7 @@ export default function LessonDetail({ params: paramsPromise }) {
             if (data.done) {
               speakText(fullContent);
               
-              // Update progress and check for unlocking
-              const progressRes = await api.post('/lesson/progress', {
+              const progressRes = await api.post('/english/lessons/progress', {
                 lessonId: lesson._id,
                 score: data.analysis?.fluencyScore || 0,
                 completed: true,
@@ -91,7 +99,7 @@ export default function LessonDetail({ params: paramsPromise }) {
               });
 
               if (progressRes.data.thresholdMet) {
-                alert("🎉 Congratulations! You've mastered this lesson and unlocked the next challenge!");
+                alert("🎉 Great job! You've mastered this concept. Let's move to the next lesson!");
               }
             }
           }
@@ -104,7 +112,7 @@ export default function LessonDetail({ params: paramsPromise }) {
     }
   };
 
-  if (loading) return <div className="flex-1 flex items-center justify-center">Loading Lesson...</div>;
+  if (loading) return <div className="flex-1 flex items-center justify-center">Entering AI Classroom...</div>;
   if (!lesson) return <div className="flex-1 flex items-center justify-center">Lesson not found</div>;
 
   return (
@@ -112,30 +120,26 @@ export default function LessonDetail({ params: paramsPromise }) {
       <div className="flex items-center justify-between mb-4">
         <div>
           <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-1 rounded-full uppercase mb-2 inline-block">
-            Lesson {lesson.sequence} • {lesson.level}
+            Step {lesson.sequence} • {lesson.level}
           </span>
-          <h1 className="text-2xl font-bold">{lesson.title}</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+             <Sparkles className="text-primary" size={24} />
+             {lesson.title}
+          </h1>
         </div>
         <button onClick={() => router.push('/coach/lessons')} className="text-sm font-medium hover:text-primary transition-colors">Back to Library</button>
       </div>
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0 overflow-hidden">
-        <div className="lg:col-span-2 flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar">
-          <div className="bg-card border border-border rounded-2xl overflow-hidden aspect-video relative group shadow-lg">
-            {lesson.videoUrl && lesson.videoUrl.includes('youtube') ? (
-              <iframe
-                src={lesson.videoUrl}
-                className="w-full h-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              ></iframe>
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center bg-primary/5 p-12 text-center">
-                <Sparkles size={48} className="text-primary mb-4 animate-bounce" />
-                <h3 className="text-xl font-bold mb-2">Lesson Explanation</h3>
-                <p className="text-foreground/60">{lesson.explanation}</p>
-              </div>
-            )}
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0 overflow-hidden">
+        <div className="flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar">
+          <div className="bg-card border border-border rounded-2xl p-8 flex flex-col items-center justify-center text-center shadow-sm min-h-[300px]">
+            <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mb-6 animate-pulse">
+               <Mic className="text-primary" size={40} />
+            </div>
+            <h3 className="text-xl font-bold mb-3">AI Teacher is Speaking...</h3>
+            <p className="text-foreground/70 text-lg leading-relaxed italic">
+               "{lesson.explanation}"
+            </p>
           </div>
 
           <div className="bg-card border border-border rounded-2xl p-6">
@@ -192,9 +196,6 @@ export default function LessonDetail({ params: paramsPromise }) {
                 </div>
               </div>
             )}
-          </div>
-          <div className="h-48 rounded-2xl border border-border overflow-hidden relative">
-             <VideoPlayer videoRef={videoRef} error={mediaError} />
           </div>
         </div>
       </div>
