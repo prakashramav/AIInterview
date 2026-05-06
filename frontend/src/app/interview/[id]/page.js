@@ -244,21 +244,21 @@ export default function LiveInterviewSession({ params: paramsPromise }) {
   if (!interview) return <div className="flex-1 flex items-center justify-center">Interview not found</div>;
 
   return (
-    <div className="flex-1 flex flex-col max-w-7xl mx-auto w-full p-4 md:p-6 h-[calc(100vh-4rem)]">
+    <div className="flex-1 flex flex-col max-w-7xl mx-auto w-full p-3 md:p-6 min-h-[calc(100vh-4rem)]">
       
       {/* Header */}
-      <div className="flex items-center justify-between bg-card border border-border p-4 rounded-2xl shadow-sm mb-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-card border border-border p-4 rounded-2xl shadow-sm mb-4 gap-4">
         <div>
           <h2 className="font-bold text-lg flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-            Live Interview Session
+            Live Interview
           </h2>
-          <p className="text-sm text-foreground/60">{interview.jobRole} • {interview.experienceLevel}</p>
+          <p className="text-xs md:text-sm text-foreground/60">{interview.jobRole} • {interview.experienceLevel}</p>
         </div>
         <button 
           onClick={handleComplete}
           disabled={completing || isRecording || processing}
-          className="flex items-center gap-2 bg-card text-foreground hover:bg-red-500/10 hover:text-red-500 px-4 py-2 rounded-lg font-medium text-sm transition-colors border border-border"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-card text-foreground hover:bg-red-500/10 hover:text-red-500 px-4 py-2 rounded-lg font-bold text-sm transition-colors border border-border"
         >
           {completing ? 'Evaluating...' : 'End Interview'}
         </button>
@@ -266,13 +266,13 @@ export default function LiveInterviewSession({ params: paramsPromise }) {
 
       {mediaError && (
         <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-xl mb-4 flex items-center gap-3">
-          <AlertTriangle size={20} />
-          <p className="text-sm">{mediaError}</p>
+          <AlertTriangle size={20} className="flex-shrink-0" />
+          <p className="text-xs md:text-sm">{mediaError}</p>
         </div>
       )}
 
       {/* Main Video Layout */}
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 min-h-[400px]">
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 min-h-[300px]">
         {/* Candidate Feed */}
         <VideoPlayer videoRef={videoRef} error={mediaError} />
 
@@ -285,18 +285,18 @@ export default function LiveInterviewSession({ params: paramsPromise }) {
       </div>
 
       {/* Real-time Transcript */}
-      <div className="mt-4 bg-background/50 border border-border rounded-xl p-4 min-h-[80px] flex items-center justify-center text-center">
+      <div className="mt-4 bg-background/50 border border-border rounded-xl p-4 min-h-[60px] md:min-h-[80px] flex items-center justify-center text-center">
         {transcript ? (
-          <p className="text-foreground/80 italic text-sm max-w-3xl">"{transcript}"</p>
+          <p className="text-foreground/80 italic text-xs md:text-sm max-w-3xl">"{transcript}"</p>
         ) : (
-          <p className="text-foreground/40 text-sm">
+          <p className="text-foreground/40 text-[10px] md:text-sm">
             {isRecording ? "Listening..." : "Your speech transcript will appear here..."}
           </p>
         )}
       </div>
 
       {/* Controls */}
-      <div className="mt-6 flex justify-center pb-8">
+      <div className="mt-6 flex justify-center pb-6 md:pb-8">
         <RecorderControls 
           isRecording={isRecording}
           isProcessing={processing}
