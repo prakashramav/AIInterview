@@ -1,21 +1,18 @@
 const mongoose = require('mongoose');
 
 const lessonSchema = new mongoose.Schema({
-  title: { type: String, required: true },
+  day: { type: Number, required: true, unique: true },
   level: { 
     type: String, 
-    enum: ['Beginner', 'Intermediate', 'Advanced'], 
+    enum: ['A1', 'A2', 'B1', 'B2', 'C1'], 
     required: true 
   },
-  topic: { 
-    type: String, 
-    enum: ['Grammar', 'Daily Conversation', 'Interview English', 'Business English'],
-    required: true 
-  },
+  title: { type: String, required: true },
+  topic: { type: String, required: true },
+  goal: { type: String, required: true },
   explanation: { type: String, required: true },
   examples: [String],
-  practice: [String],
-  videoUrl: { type: String }, // YouTube or D-ID URL
+  speakingTasks: [String],
   sequence: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now }
 });

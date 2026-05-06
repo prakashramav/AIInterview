@@ -8,8 +8,16 @@ const coachSessionSchema = new mongoose.Schema({
   },
   level: {
     type: String,
-    enum: ['Beginner', 'Intermediate', 'Advanced'],
-    default: 'Beginner'
+    enum: ['A1', 'A2', 'B1', 'B2', 'C1', 'Beginner', 'Intermediate', 'Advanced'],
+    default: 'A1'
+  },
+  lessonId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Lesson'
+  },
+  currentStep: {
+    type: Number,
+    default: 1 // 1-12 as per the new interactive flow
   },
   messages: [
     {

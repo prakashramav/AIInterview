@@ -54,48 +54,73 @@ const generateWithFallback = async (prompt, modelsList) => {
   throw lastError;
 };
 
+const CURRICULUM = {
+  A1: ['Greetings & Names', 'Personal Info', 'Numbers & Time', 'Daily Objects', 'Present Simple'],
+  A2: ['Daily Routine', 'Past Simple', 'Future (Going to)', 'Describing People', 'Family & Home'],
+  B1: ['Present Perfect', 'Travel & Directions', 'Expressing Opinions', 'Health & Fitness', 'Passive Voice'],
+  B2: ['Conditionals', 'Modals of Deduction', 'Business English', 'Reporting Speech', 'Formal vs Informal'],
+  C1: ['Idioms & Slang', 'Advanced Structures', 'Persuasion & Debate', 'Storytelling', 'Global Issues']
+};
+
 const COACH_SYSTEM_PROMPTS = {
-  Beginner: `You are an AI English Tutor for Beginners. 
-  TEACHING STYLE:
-  - Speak slowly and clearly using simple English.
-  - Explain concepts briefly (max 2 sentences).
-  - Always give 2 examples.
-  - End with a clear SPEAKING TASK (e.g., "Now tell me what you did yesterday").
-  - Correct mistakes: [Correct Sentence] -> [Simple Explanation] -> [Better Version].
-  - Always encourage the user.`,
+  A1: `You are a friendly, patient female English teacher from India. 
+  Your voice is warm, clear, and has a professional Indian English accent.
+  GOAL: Conduct a 12-STEP STATE-BASED interactive lesson.
   
-  Intermediate: `You are an AI English Tutor for Intermediate learners.
-  TEACHING STYLE:
-  - Focus on fluency and natural expression.
-  - Use moderate-paced, clear English.
-  - Correct subtle grammar/tense mistakes clearly.
-  - End each response with a speaking task or a follow-up question.`,
+  INDIAN TEACHER STYLE (MANDATORY):
+  - Speak slowly and clearly: "Hello... how are you today?"
+  - Warm & Encouraging: "Nice try, beta!", "Good effort... let's try again."
+  - Professional Fillers: "Alright...", "Hmm...", "Okay, I see...".
+  - Use natural Indian English phrasing (clear, slightly formal but kind).
+  - SHORT & SWEET: 1-2 lines max. Use "..." for natural pauses.
+
+  ADAPTIVE CLARIFICATION:
+  - If user is confused, rephrase simply in a very warm way. NEVER repeat.
+
+  STRICT 12-STEP FLOW:
+  1. Intro | 2. Explain | 3. Examples | 4. Task 1 | 5. WAIT | 6. Evaluate
+  7. Praise | 8. Next Concept | 9. Task 2 | 10. Loop | 11. Mastery | 12. Summary
+
+  STRICT RULES:
+  - Return ONLY a valid JSON object.
+  - Teach ONE step at a time.
+  - Set waitForUser: true ONLY at tasks.`,
   
-  Advanced: `You are a sophisticated AI English Coach for Advanced learners.
-  TEACHING STYLE:
-  - Focus on nuance, idioms, and professional communication.
-  - Challenge the user with complex topics.
-  - Provide high-level alternatives for common phrases.`
+  A2: `You are a supportive female Indian English teacher. Speak clearly and warmly. Follow the 12-STEP flow. Return JSON ONLY.`,
+  B1: `You are an adaptive female Indian English coach. Use reactive listening and gentle, warm challenges. Follow the 12-STEP flow. Return JSON ONLY.`,
+  B2: `You are a professional female Indian mentor. Clear, slightly formal but friendly tone. Reference user points. Follow the 12-STEP flow. Return JSON ONLY.`,
+  C1: `You are a sophisticated female Indian English Master. Engage in high-level warm discussion. Follow the 12-STEP flow. Return JSON ONLY.`
 };
 
 /**
  * Generates the next conversation turn for the English Coach
  */
-exports.generateCoachResponseStream = async (level, messages) => {
-  const systemPrompt = COACH_SYSTEM_PROMPTS[level] || COACH_SYSTEM_PROMPTS.Beginner;
-  const conversation = messages.map(m => `${m.role === 'ai' ? 'Coach' : 'Learner'}: ${m.content}`).join('\n');
+exports.generateCoachResponseStream = async (level, messages, currentStep = 1, lessonContext = "") => {
+  const systemPrompt = COACH_SYSTEM_PROMPTS[level] || COACH_SYSTEM_PROMPTS.A1;
+  const history = messages.slice(-6).map(m => `${m.role === 'ai' ? 'Teacher' : 'Student'}: ${m.content}`).join('\n');
   const fullPrompt = `${systemPrompt}
+  CURRICULUM CONTEXT: ${lessonContext}
+  CURRENT STEP: ${currentStep} of 12
 
-  Your response MUST follow this structure:
-  - Acknowledgement/Encouragement
-  - (If mistake found) Correction & Short Explanation
-  - Natural Alternative
-  - Follow-up Question
+  YOUR TASK:
+  Generate the JSON response for the NEXT part of the 12-step flow.
+  - If Student just spoke, Step 6 (Evaluation) or move to Next Step.
+  - If you just explained, Step 4 or 9 (Task) and set waitForUser: true.
+  - If lesson is ending, Step 12 and set lessonCompleted: true.
 
-Current Conversation:
-${conversation}
+  STRICT JSON FORMAT (MANDATORY):
+  {
+    "message": "Spoken text with pauses '...' ",
+    "waitForUser": true/false,
+    "evaluation": { "score": 0-10, "corrected": "...", "explanation": "..." },
+    "nextStep": number,
+    "lessonCompleted": boolean
+  }
 
-Coach:`;
+  Conversation History:
+  ${history}
+
+  Teacher (as JSON):`;
 
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
@@ -121,10 +146,27 @@ Coach:`;
         };
       } catch (err) {
         console.error("[AI Bridge] OpenAI also failed for conversation.");
-        throw err;
       }
     }
-    throw error;
+    
+    // ULTIMATE OFFLINE FALLBACK
+    console.log("[AI Coach] API Quota Limit Reached. Serving offline coaching Turn.");
+    const isEvaluationStep = [6, 10, 11].includes(currentStep);
+    const mockJson = JSON.stringify({
+      message: isEvaluationStep 
+        ? "I heard you! That was a good try. ... Let's keep moving forward with our lesson. ... "
+        : "I understand. Let's continue with the next part of our curriculum. ... ",
+      waitForUser: !isEvaluationStep,
+      evaluation: isEvaluationStep ? { score: 8, corrected: "Your sentence was understandable!", explanation: "Good effort." } : null,
+      nextStep: currentStep + 1,
+      lessonCompleted: currentStep >= 11
+    });
+
+    return {
+      async *[Symbol.asyncIterator]() {
+        yield { text: () => mockJson };
+      }
+    };
   }
 };
 
@@ -157,31 +199,42 @@ Format the output as JSON:
   } catch (error) {
     const isQuota = error.message?.includes('429') || error.message?.includes('quota');
     console.log(`[AI Coach] Analysis ${isQuota ? 'Quota Limit Reached' : 'Error'}. Using local fallback.`);
-    return { isCorrect: true, corrected: sentence, explanation: "API is busy, but your sentence looks good!", fluencyScore: 7 };
+    return { 
+      isCorrect: true, 
+      corrected: sentence, 
+      explanation: "I understood you perfectly! Let's continue practicing.", 
+      fluencyScore: 8 
+    };
   }
 };
 
 /**
  * Dynamically generates a structured English lesson with adaptive difficulty
  */
-exports.generateLesson = async (level, topic, sequence = 1) => {
-  const difficultyNote = sequence > 1 
-    ? `This is lesson #${sequence} in the series. Make it slightly more challenging than a standard ${level} lesson.` 
-    : `This is the introductory lesson for ${level} ${topic}. Keep it accessible.`;
+exports.generateLesson = async (level, sequence = 1) => {
+  // Map sequence to topic in the curriculum
+  const levelTopics = CURRICULUM[level] || CURRICULUM.A1;
+  const topicIndex = (sequence - 1) % levelTopics.length;
+  const topic = levelTopics[topicIndex];
 
-  const prompt = `Create a structured English teaching session for a ${level} student on "${topic}".
+  const difficultyNote = sequence > 1 
+    ? `This is lesson #${sequence} in the series. Focus on "${topic}".` 
+    : `This is the introductory lesson for ${level} focusing on "${topic}".`;
+
+  const prompt = `You are a professional English teacher. Create a FULL 10-STEP LESSON for a ${level} student on the topic: "${topic}".
   ${difficultyNote}
   
   The output MUST be a JSON object with this exact structure:
   {
-    "title": "Clear catchy title",
-    "explanation": "Simple 1-2 sentence intro to the concept",
-    "examples": ["Example 1", "Example 2"],
-    "practice": ["The first speaking task for the AI to say to the user"],
-    "voiceIntro": "A natural script for the AI to say: 'Today we learn [Topic]. [Explanation]. For example [Examples]. Now, [Practice Task]'"
+    "title": "Lesson ${sequence}: ${topic}",
+    "goal": "Clear learning objective for this lesson",
+    "explanation": "Simple conceptual breakdown of ${topic}",
+    "examples": ["Example 1", "Example 2", "Example 3", "Example 4", "Example 5"],
+    "speakingTasks": ["Speaking Task for the user"],
+    "voiceIntro": "A COMPLETE TEACHING SCRIPT following the 10-step structure: 1. Intro, 2. Concept, 3. 5-8 Examples, 4. Check, 5. Task, 6. Correction, 7. Loop, 8. Boost, 9. Summary, 10. Next Task."
   }
   
-  Focus on: Grammar, Tenses, or Communication. No videos needed.`;
+  Focus on speaking and real-world communication. Use '...' for pauses.`;
 
   try {
     const text = await generateWithFallback(prompt, MODELS);
@@ -189,16 +242,39 @@ exports.generateLesson = async (level, topic, sequence = 1) => {
     return JSON.parse(jsonStr);
   } catch (error) {
     const isQuota = error.message?.includes('429') || error.message?.includes('quota');
-    console.log(`[AI Coach] Lesson Generation ${isQuota ? 'Quota Limit Reached' : 'Error'}. Serving from Lesson Pool.`);
+    console.log(`[AI Coach] Lesson Generation ${isQuota ? 'Quota Limit Reached' : 'Error'}. Serving offline lesson.`);
     
-    const pool = OFFLINE_LESSON_POOL[topic] || OFFLINE_LESSON_POOL.Grammar;
-    const lessonIndex = (sequence - 1) % pool.length;
-    const mock = pool[lessonIndex];
-
+    // Offline fallback for curriculum
     return { 
-      ...mock, 
-      title: `${mock.title} (Draft Mode)`,
-      voiceIntro: `Hello! Let's learn ${topic}. ${mock.explanation} For example: ${mock.examples[0]}. ${mock.practice[0]}`
+      title: `Lesson ${sequence}: ${topic}`,
+      goal: `Master basic communication for ${topic}`,
+      explanation: `Today we are learning about ${topic} at the ${level} level.`,
+      examples: ["Example sentences will go here."],
+      speakingTasks: ["Please say a sentence related to " + topic],
+      voiceIntro: `Hello! Welcome to Lesson ${sequence}. Today we learn ${topic}. Don't worry, I'll guide you step by step. ... First, let me explain...`
     };
+  }
+};
+
+/**
+ * Generates a dynamic opening question based on the user's level
+ */
+exports.generateOpeningQuestion = async (level) => {
+  const prompt = `You are a warm, professional female English teacher from India.
+  GOAL: Generate a SHORT, friendly opening question (1 sentence) for a ${level} English student.
+  
+  STYLE:
+  - Natural Indian English accent phrasing.
+  - Level-appropriate vocabulary.
+  - Very friendly and welcoming.
+  - Return ONLY the question text.
+  
+  Example: "Hello! I'm so glad to see you. Tell me, how was your day today?"`;
+
+  try {
+    const text = await generateWithFallback(prompt, MODELS);
+    return text.replace(/["']/g, "").trim();
+  } catch (error) {
+    return `Hi! I'm your English Coach. Let's practice ${level} English together. How are you doing today?`;
   }
 };

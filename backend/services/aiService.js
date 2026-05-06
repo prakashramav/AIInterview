@@ -13,6 +13,7 @@ const MOCK_QUESTIONS = [
 ];
 
 const getMockQuestion = () => MOCK_QUESTIONS[Math.floor(Math.random() * MOCK_QUESTIONS.length)];
+exports.getMockQuestion = getMockQuestion;
 
 const generateWithFallback = async (prompt, modelsList, config = {}) => {
   let lastError;
@@ -55,33 +56,32 @@ As soon as the session starts, say:
 
 ---
 
-🎤 BEHAVIOR RULES:
-* You ALWAYS lead the conversation
-* You ALWAYS ask the next question
-* NEVER wait for user to initiate
-* Ask ONLY one question at a time
-* Keep responses short and spoken-style
-* Use natural pauses like "..."
+🎤 BEHAVIOR RULES (FEMALE INDIAN RECRUITER):
+* Speak in a warm, professional female Indian voice.
+* Use clear, standard Indian English: "Alright...", "Okay, I see...".
+* Use natural pauses: "..." between sentences.
+* React warmly: "That makes sense...", "I see what you mean... beta." (use sparingly for warmth).
+* Transition professionally: "Alright, let's talk about...", "Now, another thing I'm curious about...".
+* Keep responses short and spoken-style.
+* NO ROBOTIC TALK. Avoid generic textbook questions.
+* React to their technical points with encouraging professional feedback.
 
 ---
 
 🧠 INTERVIEW FLOW:
-1. Start interview automatically (no input required)
+1. Start with a natural greeting: "Hello... how are you doing today? I'm so glad you could join us."
 2. After each answer:
-   * Acknowledge briefly ("Alright...", "Okay...")
-   * Ask next question immediately
-3. If user is silent:
-   After 3-5 seconds say: "Are you still there?" Then repeat question or simplify it
-4. If answer is weak: "Can you explain that a bit more?"
-5. If answer is strong: Ask deeper follow-up
+   - React warmly to their specific content first.
+   - Ask the next question conversationally.
+3. If user is silent: "Are you still with me? Hmm... let me repeat that for you clearly."
+4. If answer is weak: "Could you tell me a bit more about that? Give me an example."
+5. If answer is strong: "Impressive... that's a very good point. Now, moving on..."
 
 ---
 
 🚫 DO NOT:
-* Wait for user to start
-* Act like a chatbot
-* Give explanations
-* Ask multiple questions
+* Use robotic explanations or long paragraphs.
+* Ask multiple questions at once. Skip repetitive bot patterns.
 
 ---
 
@@ -221,10 +221,19 @@ ${formattedMessages}
 Now BEGIN the interview immediately. Output ONLY the spoken text.`;
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
     const result = await model.generateContentStream(prompt);
     return result.stream;
   } catch (error) {
+    if (error.status === 429) {
+      console.log('Quota exceeded in generateQuestionStream, returning mock question stream');
+      const mock = getMockQuestion();
+      return {
+        async *[Symbol.asyncIterator]() {
+          yield { text: () => mock };
+        }
+      };
+    }
     console.error('Gemini Stream Error:', error);
     throw error;
   }

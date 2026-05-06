@@ -3,9 +3,7 @@ import { useEffect, useState, useRef, use } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/services/api';
 import { Sparkles, Mic, Square, Play, RefreshCcw, CheckCircle2, AlertCircle } from 'lucide-react';
-import useMediaStream from '@/hooks/useMediaStream';
 import useSpeechRecognition from '@/hooks/useSpeechRecognition';
-import VideoPlayer from '@/components/VideoPlayer';
 
 export default function LessonDetail({ params: paramsPromise }) {
   const params = use(paramsPromise);
@@ -48,7 +46,9 @@ export default function LessonDetail({ params: paramsPromise }) {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     const voices = window.speechSynthesis.getVoices();
-    const indianVoice = voices.find(v => v.lang.includes('en-IN') || v.name.includes('India'));
+    // Prioritize Female Indian voices
+    const indianVoice = voices.find(v => (v.lang.includes('en-IN') || v.name.includes('India')) && (v.name.includes('Female') || v.name.includes('Heera') || v.name.includes('Neerja'))) 
+                    || voices.find(v => v.lang.includes('en-IN') || v.name.includes('India'));
     if (indianVoice) utterance.voice = indianVoice;
     window.speechSynthesis.speak(utterance);
   };
@@ -68,7 +68,7 @@ export default function LessonDetail({ params: paramsPromise }) {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ 
           message: text,
-          context: `Lesson Topic: ${lesson.topic}, Lesson Title: ${lesson.title}. Current Task: ${lesson.practice[0]}`
+          context: `Lesson Topic: ${lesson.topic}, Lesson Title: ${lesson.title}. Current Task: ${lesson.speakingTasks?.[0] || lesson.practice?.[0]}`
         })
       });
 
@@ -117,41 +117,63 @@ export default function LessonDetail({ params: paramsPromise }) {
 
   return (
     <div className="flex-1 flex flex-col max-w-7xl mx-auto w-full p-4 h-[calc(100vh-4rem)]">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-1 rounded-full uppercase mb-2 inline-block">
-            Step {lesson.sequence} • {lesson.level}
-          </span>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-             <Sparkles className="text-primary" size={24} />
-             {lesson.title}
-          </h1>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <div className="bg-primary/10 text-primary w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl">
+             {lesson.day}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full uppercase">
+                {lesson.level} • {lesson.topic}
+              </span>
+            </div>
+            <h1 className="text-2xl font-black flex items-center gap-2 mt-0.5">
+               {lesson.title}
+            </h1>
+          </div>
         </div>
-        <button onClick={() => router.push('/coach/lessons')} className="text-sm font-medium hover:text-primary transition-colors">Back to Library</button>
+        <button onClick={() => router.push('/coach/lessons')} className="bg-secondary/50 hover:bg-secondary text-sm font-bold px-4 py-2 rounded-xl transition-all">
+          Exit Classroom
+        </button>
       </div>
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0 overflow-hidden">
-        <div className="flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar">
-          <div className="bg-card border border-border rounded-2xl p-8 flex flex-col items-center justify-center text-center shadow-sm min-h-[300px]">
-            <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mb-6 animate-pulse">
-               <Mic className="text-primary" size={40} />
-            </div>
-            <h3 className="text-xl font-bold mb-3">AI Teacher is Speaking...</h3>
-            <p className="text-foreground/70 text-lg leading-relaxed italic">
-               "{lesson.explanation}"
-            </p>
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0 overflow-hidden">
+        {/* Left Column: Teacher Panel */}
+        <div className="lg:col-span-4 flex flex-col gap-4 overflow-hidden">
+          {/* AI Teacher Visual */}
+          <div className="bg-card border border-border rounded-3xl overflow-hidden aspect-video shadow-lg relative flex items-center justify-center bg-primary/5 group">
+             <div className="relative">
+                <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl animate-pulse" />
+                <div className="relative w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                   <Sparkles size={40} className="animate-bounce" />
+                </div>
+             </div>
+             <div className="absolute bottom-4 left-0 right-0 text-center">
+                <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">AI Master Teacher</span>
+             </div>
           </div>
 
-          <div className="bg-card border border-border rounded-2xl p-6">
-            <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-              <Sparkles size={18} className="text-primary" /> Key Examples
-            </h3>
+          {/* Teacher Explanation */}
+          <div className="flex-1 bg-card border border-border rounded-3xl p-6 shadow-sm overflow-y-auto custom-scrollbar">
+            <div className="flex items-center gap-3 mb-4">
+               <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                  <Sparkles size={16} />
+               </div>
+               <h3 className="font-bold text-sm uppercase tracking-widest text-foreground/60">Teacher's Note</h3>
+            </div>
+            <p className="text-foreground/80 leading-relaxed font-medium italic mb-6">
+               "{lesson.explanation}"
+            </p>
+
             <div className="space-y-3">
+              <p className="text-[10px] font-bold text-foreground/40 uppercase mb-2">Practice Examples</p>
               {lesson.examples.map((ex, i) => (
-                <div key={i} className="bg-foreground/5 p-4 rounded-xl border border-border/50 flex items-center justify-between group">
-                  <p className="text-sm italic">"{ex}"</p>
+                <div key={i} className="bg-foreground/5 p-3 rounded-2xl border border-border/50 flex items-center justify-between group">
+                  <p className="text-sm italic font-medium">"{ex}"</p>
                   <button onClick={() => speakText(ex)} className="p-2 rounded-lg bg-primary/10 text-primary opacity-0 group-hover:opacity-100 transition-all">
-                    <RefreshCcw size={14} />
+                    <RefreshCcw size={12} />
                   </button>
                 </div>
               ))}
@@ -159,43 +181,73 @@ export default function LessonDetail({ params: paramsPromise }) {
           </div>
         </div>
 
-        <div className="flex flex-col gap-4">
-          <div className="bg-card border border-border rounded-2xl p-6 flex-1 flex flex-col shadow-sm">
-            <h3 className="font-bold mb-6">Speaking Practice</h3>
-            <div className="bg-foreground/5 p-4 rounded-xl border border-border mb-6">
-              <p className="text-xs font-bold text-foreground/40 mb-2 uppercase">Your Task</p>
-              <p className="text-sm font-medium italic">"{lesson.practice[0]}"</p>
-            </div>
-
-            <div className="flex-1 flex flex-col justify-center gap-4 text-center">
-              <p className="text-sm italic text-foreground/60">
-                {transcript || (isRecording ? "Listening..." : "Click to speak")}
-              </p>
-              <div className="flex justify-center mt-4">
-                <button
-                  onClick={isRecording ? handlePracticeAnswer : startRecording}
-                  disabled={processing}
-                  className={`w-16 h-16 rounded-full flex items-center justify-center transition-all shadow-xl ${
-                    isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-primary text-white'
-                  }`}
-                >
-                  {processing ? <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : (isRecording ? <Square size={24} /> : <Mic size={24} />)}
-                </button>
-              </div>
-            </div>
-
-            {lastCorrection && (
-              <div className="mt-6 pt-6 border-t border-border">
-                <div className="flex items-start gap-3 bg-primary/5 p-4 rounded-xl">
-                  {lastCorrection.isCorrect ? <CheckCircle2 className="text-green-500" size={18} /> : <AlertCircle className="text-primary" size={18} />}
-                  <div>
-                    <p className="text-[10px] font-bold text-primary uppercase">Coach Feedback</p>
-                    <p className="text-sm font-medium">{lastCorrection.corrected}</p>
-                    <p className="text-[10px] text-foreground/60 mt-1">Fluency Score: {lastCorrection.fluencyScore}/10</p>
-                  </div>
+        {/* Center/Right Column: Interaction Area */}
+        <div className="lg:col-span-8 flex flex-col gap-4">
+          <div className="flex-1 bg-card border border-border rounded-[2.5rem] p-10 flex flex-col shadow-xl relative overflow-hidden">
+            {/* Background Decoration */}
+            <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
+            
+            <div className="relative flex-1 flex flex-col">
+              <div className="mb-10">
+                <h3 className="text-2xl font-black mb-4">Speaking Practice</h3>
+                <div className="bg-primary/5 border border-primary/10 p-6 rounded-3xl">
+                  <p className="text-xs font-bold text-primary mb-2 uppercase tracking-widest">Today's Goal</p>
+                  <p className="text-xl font-medium text-foreground/80 italic leading-snug">
+                    "{lesson.speakingTasks?.[0] || lesson.practice?.[0]}"
+                  </p>
                 </div>
               </div>
-            )}
+
+              <div className="flex-1 flex flex-col items-center justify-center text-center py-10">
+                <div className="mb-8 relative">
+                   <div className={`absolute inset-0 bg-primary/20 rounded-full blur-2xl transition-all duration-500 ${isRecording ? 'scale-150' : 'scale-0'}`} />
+                   <button
+                    onClick={isRecording ? handlePracticeAnswer : startRecording}
+                    disabled={processing}
+                    className={`relative w-28 h-28 rounded-full flex items-center justify-center transition-all shadow-2xl z-10 ${
+                      isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-primary text-white hover:scale-105'
+                    }`}
+                  >
+                    {processing ? <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div> : (isRecording ? <Square size={32} /> : <Mic size={32} />)}
+                  </button>
+                </div>
+
+                <p className="text-xl font-bold tracking-tight mb-2">
+                  {processing ? "Evaluating..." : isRecording ? "I'm listening..." : "Tap to Speak"}
+                </p>
+                <div className="max-w-xl mx-auto">
+                   <p className="text-foreground/40 text-sm italic min-h-[1.5rem]">
+                      {transcript || (isRecording ? "Try to speak clearly..." : "Respond to the teacher's task above")}
+                   </p>
+                </div>
+              </div>
+
+              {lastCorrection && (
+                <div className="mt-auto animate-in slide-in-from-bottom duration-500">
+                  <div className={`p-6 rounded-[2rem] border-2 flex items-start gap-4 transition-all ${
+                    lastCorrection.isCorrect ? 'bg-green-500/5 border-green-500/20' : 'bg-primary/5 border-primary/20'
+                  }`}>
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                      lastCorrection.isCorrect ? 'bg-green-500/20 text-green-500' : 'bg-primary/20 text-primary'
+                    }`}>
+                      {lastCorrection.isCorrect ? <CheckCircle2 size={24} /> : <Sparkles size={24} />}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-3 mb-1">
+                        <p className="text-sm font-black uppercase tracking-wider text-primary">Tutor Feedback</p>
+                        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-lg text-[10px] font-black">
+                          {lastCorrection.fluencyScore}/10
+                        </span>
+                      </div>
+                      <p className="text-lg font-medium leading-relaxed">{lastCorrection.corrected}</p>
+                      <p className="text-sm text-foreground/50 mt-2 leading-relaxed">
+                         {lastCorrection.explanation}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

@@ -1,35 +1,42 @@
 # InterviewAI 🚀
 
-**InterviewAI** is a production-grade, AI-powered mock interview platform designed to simulate a real-world video interview experience. It features a realistic AI interviewer with voice, video, and real-time streaming capabilities to help candidates prepare for their dream jobs.
+**InterviewAI** is a production-grade, AI-powered career readiness platform. It combines a realistic **Technical Interviewer** with a comprehensive **60-Day English Communication Coach** to help candidates master both technical and soft skills.
 
 ---
 
 ## ✨ Key Features
 
-- 🎭 **Real-Time AI Avatar**: A photorealistic AI interviewer that reacts to your answers. Includes D-ID integration for lip-synced video and a high-quality animated fallback.
-- 🎙️ **Voice Interaction**: Completely verbal interview flow using native browser Web Speech APIs (STT & TTS) for zero-latency, free interaction.
-- ⚡ **Low-Latency Streaming**: AI responses are streamed sentence-by-sentence using Server-Sent Events (SSE), ensuring the interviewer starts speaking within milliseconds.
-- 🧠 **Smart Evaluation**: Deep analytical feedback using Google Gemini AI, providing scores (out of 10), specific strengths, weaknesses, and actionable study suggestions.
-- 🇮🇳 **Localized Experience**: Optimized for Indian English accents and standard tech roles (SDE, Frontend, Data Science, etc.).
-- 🛡️ **Production Hardened**: Secured with JWT authentication, HTTP security headers (Helmet), and intelligent rate limiting.
-- ⏳ **Inactivity Detection**: Automatically ends the interview after 2 minutes of silence to simulate real-world call behavior.
+### 🎓 AI English Coach (New!)
+- 📅 **60-Day Fluency Program**: A structured roadmap from Beginner to Advanced levels.
+- 1️⃣2️⃣ **12-Step State-Based Pedagogy**: Lessons follow a professional teaching flow: Intro → Explanation → Examples → Tasks → Evaluation → Mastery.
+- 🇮🇳 **Indian English Teacher Persona**: A warm, supportive female persona with a professional Indian English accent.
+- 🧠 **Adaptive Clarification**: If you're confused, the AI rephrases and simplifies automatically—never repeating the same robotic lines.
+
+### 🎭 Technical Interviewer
+- 🎙️ **Voice Interaction**: Completely verbal interview flow using Web Speech APIs for zero-latency.
+- 🛰️ **Adaptive Questioning**: Questions dynamically evolve based on your technical depth and previous answers.
+- ⚡ **Low-Latency Streaming**: AI responses are streamed using SSE, ensuring an interactive experience.
+- 🛡️ **Production Resilient**: Multi-tier fallback system (Gemini → OpenAI → Offline Mock) ensures the session never crashes due to API quotas.
+
+### 📊 Advanced Evaluation
+- 🔍 **Granular Analysis**: Deep feedback on grammar, technical accuracy, and pronunciation.
+- 📈 **Mastery Progress**: Tracks your 60-day journey with fluency scores and daily milestones.
 
 ---
 
 ## 🛠️ Tech Stack
 
 ### Frontend
-- **Framework**: Next.js 14+ (App Router)
-- **Styling**: Tailwind CSS
+- **Framework**: Next.js 14+ (App Router, JavaScript)
+- **Styling**: Tailwind CSS (Premium Glassmorphism Design)
 - **Animations**: Framer Motion
 - **Icons**: Lucide React
-- **State Management**: React Hooks & Context API
 
 ### Backend
 - **Runtime**: Node.js / Express
 - **Database**: MongoDB (Mongoose)
-- **AI Models**: Google Gemini (Pro & Flash)
-- **Security**: JWT, Helmet, Express-Rate-Limit, Morgan
+- **AI Engine**: Google Gemini 2.0 Flash (Primary), OpenAI GPT-4o (Fallback)
+- **Voice**: Web Speech API (Browser) & OpenAI TTS-1 (Nova/Female Fallback)
 
 ---
 
@@ -37,8 +44,9 @@
 
 ### Prerequisites
 - Node.js (v18+)
-- MongoDB Atlas or local MongoDB instance
-- Google AI Studio API Key (Gemini)
+- MongoDB Atlas or local instance
+- Google AI Studio API Key
+- OpenAI API Key (for fallback/TTS)
 
 ### Installation
 
@@ -53,13 +61,13 @@
    cd backend
    npm install
    ```
-   Create a `.env` file in the `backend` folder:
+   Create a `.env` file:
    ```env
    PORT=5000
    MONGO_URI=your_mongodb_uri
    JWT_SECRET=your_secret_key
    GEMINI_API_KEY=your_gemini_api_key
-   DID_API_KEY=your_did_key (optional)
+   OPENAI_API_KEY=your_openai_api_key
    ```
    Start the backend:
    ```bash
@@ -71,7 +79,7 @@
    cd ../frontend
    npm install
    ```
-   Create a `.env.local` file in the `frontend` folder:
+   Create a `.env.local` file:
    ```env
    NEXT_PUBLIC_API_URL=http://localhost:5000
    ```
@@ -82,14 +90,9 @@
 
 ---
 
-## 📸 Screenshots
-*(Add your screenshots here)*
-
----
-
 ## 📜 License
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the MIT License.
 
 ---
 
-Developed with ❤️ Prakash Ramavath.
+Developed with ❤️ by Prakash Ramavath.

@@ -34,27 +34,27 @@ export default function CoachSession({ params: paramsPromise }) {
     nudgeTimersRef.current.forEach(timer => clearTimeout(timer));
     nudgeTimersRef.current = [];
 
-    // Nudge 1: After 30 seconds
+    // Nudge 1: After 2 minutes
     nudgeTimersRef.current.push(setTimeout(() => {
       if (!isRecording && !processing) {
         const nudge = "I didn't hear anything... are you still with me? Let's keep practicing our English!";
         speakText(nudge);
       }
-    }, 30000));
+    }, 120000));
 
-    // Nudge 2: After 75 seconds
+    // Nudge 2: After 4 minutes
     nudgeTimersRef.current.push(setTimeout(() => {
       if (!isRecording && !processing) {
         const nudge = "I'm still here waiting for you. Don't worry about mistakes, just try to say something in English!";
         speakText(nudge);
       }
-    }, 75000));
+    }, 240000));
 
-    // Final Timeout: After 120 seconds
+    // Final Timeout: After 5 minutes
     inactivityTimerRef.current = setTimeout(() => {
-      alert("Session ended due to 2 minutes of inactivity.");
+      alert("Session ended due to 5 minutes of inactivity.");
       handleExit(true); // Force exit
-    }, 120000); 
+    }, 300000); 
   };
 
   useEffect(() => {
@@ -113,7 +113,9 @@ export default function CoachSession({ params: paramsPromise }) {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     const voices = window.speechSynthesis.getVoices();
-    const indianVoice = voices.find(v => v.lang.includes('en-IN') || v.name.includes('India'));
+    // Prioritize Female Indian voices
+    const indianVoice = voices.find(v => (v.lang.includes('en-IN') || v.name.includes('India')) && (v.name.includes('Female') || v.name.includes('Heera') || v.name.includes('Neerja'))) 
+                    || voices.find(v => v.lang.includes('en-IN') || v.name.includes('India'));
     if (indianVoice) utterance.voice = indianVoice;
     utterance.onstart = () => setIsAISpeaking(true);
     utterance.onend = () => setIsAISpeaking(false);
@@ -178,7 +180,7 @@ export default function CoachSession({ params: paramsPromise }) {
             <Sparkles className="text-primary animate-pulse" size={20} />
             English Communication Coach
           </h2>
-          <p className="text-sm text-foreground/60">Level: {session.level}</p>
+          <p className="text-sm text-foreground/60">Level: {session?.level}</p>
         </div>
         <button onClick={() => handleExit()} className="text-sm font-medium hover:text-primary transition-colors">Exit Session</button>
       </div>
@@ -187,7 +189,7 @@ export default function CoachSession({ params: paramsPromise }) {
         <VideoPlayer videoRef={videoRef} error={mediaError} />
         <div className="bg-card border border-border rounded-2xl flex flex-col overflow-hidden relative">
           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar flex flex-col gap-3">
-             {session.messages.map((msg, i) => (
+             {session?.messages?.map((msg, i) => (
                <div key={i} className={`max-w-[85%] p-3 rounded-2xl ${
                  msg.role === 'ai' ? 'bg-primary/10 self-start text-sm' : 'bg-foreground/5 self-end text-sm border border-border/50'
                }`}>
