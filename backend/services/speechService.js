@@ -26,7 +26,7 @@ exports.textToSpeech = async (text) => {
   try {
     const mp3 = await openai.audio.speech.create({
       model: 'tts-1',
-      voice: 'alloy',
+      voice: 'nova',
       input: text,
     });
     const buffer = Buffer.from(await mp3.arrayBuffer());

@@ -1,15 +1,17 @@
 const CoachSession = require('../models/CoachSession');
-const { generateCoachResponseStream, analyzeSentence } = require('../services/coachService');
+const { generateCoachResponseStream, analyzeSentence, generateOpeningQuestion } = require('../services/coachService');
 
 exports.startCoachSession = async (req, res) => {
   try {
     const { level } = req.body;
+    const firstQuestion = await generateOpeningQuestion(level || 'Beginner');
+
     const session = new CoachSession({
       userId: req.user.userId,
       level: level || 'Beginner',
       messages: [{
         role: 'ai',
-        content: `Hi! I'm your English Coach. Let's practice ${level || 'Beginner'} English together. How are you doing today?`
+        content: firstQuestion
       }]
     });
     await session.save();
@@ -21,20 +23,35 @@ exports.startCoachSession = async (req, res) => {
 
 exports.processUserMessageStream = async (req, res) => {
   try {
-    const { sessionId, message } = req.body;
-    const session = await CoachSession.findById(sessionId);
-    if (!session) return res.status(404).json({ message: "Session not found" });
+    const { sessionId, message, context, level } = req.body;
+    let session = null;
+    let effectiveLevel = level || 'Beginner';
+    let history = [];
+
+    if (sessionId) {
+      session = await CoachSession.findById(sessionId);
+      if (!session) return res.status(404).json({ message: "Session not found" });
+      effectiveLevel = session.level;
+      history = session.messages;
+    } else if (context) {
+      // Practice mode from LessonDetail - use transient history
+      history = [
+        { role: 'ai', content: "Lesson context initialized." },
+        { role: 'user', content: `Context: ${context}` }
+      ];
+    }
 
     // 1. Analyze the user's sentence for grammar
-    const analysis = await analyzeSentence(message, session.level);
+    const analysis = await analyzeSentence(message, effectiveLevel);
     
-    // Update session with user message and analysis
-    session.messages.push({
-      role: 'user',
-      content: message,
-      correction: analysis.isCorrect ? null : analysis.corrected,
-      explanation: analysis.isCorrect ? null : analysis.explanation
-    });
+    if (session) {
+      session.messages.push({
+        role: 'user',
+        content: message,
+        correction: analysis.isCorrect ? null : analysis.corrected,
+        explanation: analysis.isCorrect ? null : analysis.explanation
+      });
+    }
 
     // 2. Prepare for streaming response
     res.setHeader('Content-Type', 'text/event-stream');
@@ -45,31 +62,62 @@ exports.processUserMessageStream = async (req, res) => {
     res.write(`data: ${JSON.stringify({ analysis })}\n\n`);
 
     // 3. Generate Coach's reply
-    const stream = await generateCoachResponseStream(session.level, session.messages);
+    // Pass currentStep and lesson context
+    const lessonContext = session?.lessonId?.topic || context || "General Conversation";
+    const currentStep = session?.currentStep || 1;
+
+    const stream = await generateCoachResponseStream(effectiveLevel, [...history, { role: 'user', content: message }], currentStep, lessonContext);
     
-    let fullReply = "";
+    let fullContent = "";
     for await (const chunk of stream) {
       const text = chunk.text();
-      fullReply += text;
+      fullContent += text;
+      // We still stream the raw text (which is JSON) for now, 
+      // or we can try to extract the message field if we want to stream audio.
       res.write(`data: ${JSON.stringify({ chunk: text })}\n\n`);
     }
 
-    // Save Coach's reply to DB
-    session.messages.push({ role: 'ai', content: fullReply });
-    
-    // Basic progress update (can be more complex)
-    if (analysis.fluencyScore) {
-      session.progress.fluency = (session.progress.fluency + analysis.fluencyScore) / 2;
-    }
+    // Parse the final JSON from AI
+    try {
+      const jsonStr = fullContent.match(/\{.*\}/s)?.[0] || fullContent;
+      const aiResponse = JSON.parse(jsonStr);
 
-    await session.save();
-    res.write(`data: ${JSON.stringify({ done: true, messages: session.messages })}\n\n`);
+      if (session) {
+        session.messages.push({ role: 'ai', content: aiResponse.message });
+        session.currentStep = aiResponse.nextStep || (session.currentStep + 1);
+        if (aiResponse.lessonCompleted) session.status = 'completed';
+        
+        // If there's a score in the evaluation, update progress
+        if (aiResponse.evaluation?.score) {
+          session.progress.fluency = (session.progress.fluency + aiResponse.evaluation.score) / 2;
+        }
+        await session.save();
+      }
+
+      res.write(`data: ${JSON.stringify({ 
+        done: true, 
+        message: aiResponse.message,
+        waitForUser: aiResponse.waitForUser,
+        evaluation: aiResponse.evaluation,
+        nextStep: aiResponse.nextStep,
+        lessonCompleted: aiResponse.lessonCompleted
+      })}\n\n`);
+    } catch (parseError) {
+      console.error("[AI Coach] JSON Parse Error:", parseError, fullContent);
+      res.write(`data: ${JSON.stringify({ done: true, message: fullContent })}\n\n`);
+    }
+    
     res.end();
 
   } catch (error) {
     console.error("Coach stream error:", error);
-    res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
-    res.end();
+    if (!res.headersSent) {
+      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+      res.end();
+    } else {
+      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+      res.end();
+    }
   }
 };
 

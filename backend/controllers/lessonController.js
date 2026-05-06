@@ -4,8 +4,18 @@ const { generateLesson } = require('../services/coachService');
 
 exports.getLessons = async (req, res) => {
   try {
-    const lessons = await Lesson.find().sort({ createdAt: -1 });
+    const lessons = await Lesson.find().sort({ day: 1 });
     res.json(lessons);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.getLessonByDay = async (req, res) => {
+  try {
+    const lesson = await Lesson.findOne({ day: req.params.day });
+    if (!lesson) return res.status(404).json({ message: "Lesson not found" });
+    res.json(lesson);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -13,43 +23,44 @@ exports.getLessons = async (req, res) => {
 
 exports.createLesson = async (req, res) => {
   try {
-    const { level, topic } = req.body;
+    const { day } = req.body; // Target day to start
     const userId = req.user.userId;
     
-    // Find latest lesson for this user/topic to check sequence
-    const latestLesson = await Lesson.findOne({ level, topic }).sort({ sequence: -1 });
-    
-    if (latestLesson) {
-      const progress = await UserProgress.findOne({ userId, lessonId: latestLesson._id });
+    // Day 1 is always unlocked
+    if (day > 1) {
+      const prevDay = day - 1;
+      const prevLesson = await Lesson.findOne({ day: prevDay });
+      if (!prevLesson) return res.status(404).json({ message: `Previous day (${prevDay}) not found.` });
+
+      const progress = await UserProgress.findOne({ userId, lessonId: prevLesson._id });
       if (!progress || (!progress.unlockedNext && progress.score < 6)) {
         return res.status(403).json({ 
-          message: "Please complete and practice the current lesson with a score of at least 6/10 before moving forward.",
-          currentLessonId: latestLesson._id
+          message: `Please complete Day ${prevDay} with a score of at least 6/10 before moving to Day ${day}.`,
+          prevDay
         });
       }
     }
 
-    const nextSequence = latestLesson ? latestLesson.sequence + 1 : 1;
+    let lesson = await Lesson.findOne({ day });
     
-    // CACHE CHECK: If this lesson (level + topic + sequence) already exists, reuse it!
-    const existingGlobalLesson = await Lesson.findOne({ level, topic, sequence: nextSequence });
-    if (existingGlobalLesson) {
-      console.log(`[Cache] Reusing existing lesson for ${level} ${topic} #${nextSequence}`);
-      return res.status(200).json(existingGlobalLesson);
+    // If lesson doesn't exist in DB, generate it now!
+    if (!lesson) {
+      console.log(`[AI Coach] Lesson for Day ${day} missing. Generating now...`);
+      // Determine level based on day (1-12: A1, 13-24: A2, etc.)
+      const level = day <= 12 ? 'A1' : day <= 24 ? 'A2' : day <= 36 ? 'B1' : day <= 48 ? 'B2' : 'C1';
+      
+      const lessonData = await generateLesson(level, day);
+      lesson = new Lesson({
+        ...lessonData,
+        day,
+        level,
+        topic: lessonData.topic || "General Fluency",
+        sequence: day
+      });
+      await lesson.save();
     }
-
-    // Otherwise, generate new content
-    const lessonData = await generateLesson(level, topic, nextSequence);
     
-    const lesson = new Lesson({
-      ...lessonData,
-      level,
-      topic,
-      sequence: nextSequence
-    });
-    
-    await lesson.save();
-    res.status(201).json(lesson);
+    res.status(200).json(lesson);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

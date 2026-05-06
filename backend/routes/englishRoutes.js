@@ -1,5 +1,5 @@
 const express = require('express');
-const { getLessons, createLesson, getUserProgress, updateProgress } = require('../controllers/lessonController');
+const { getLessons, getLessonByDay, createLesson, getUserProgress, updateProgress } = require('../controllers/lessonController');
 const { startCoachSession, processUserMessageStream, getCoachSession, getUserSessions } = require('../controllers/coachController');
 const auth = require('../middleware/auth');
 
@@ -9,6 +9,7 @@ const router = express.Router();
  * LESSON ROUTES
  */
 router.get('/lessons', auth, getLessons);
+router.get('/lessons/day/:day', auth, getLessonByDay);
 router.post('/lessons/generate', auth, createLesson);
 router.get('/lessons/progress', auth, getUserProgress);
 router.post('/lessons/progress', auth, updateProgress);
