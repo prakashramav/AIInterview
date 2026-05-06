@@ -67,11 +67,12 @@ export default function Home() {
 
         {/* Features Grid */}
         <motion.div 
+          id="features"
           variants={staggerContainer}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-50px" }}
-          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-8 text-left w-full"
+          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-8 text-left w-full scroll-mt-20"
         >
           <FeatureCard 
             icon={<BrainCircuit className="text-primary w-8 h-8" />}
@@ -181,11 +182,12 @@ export default function Home() {
 
       {/* Pricing Section */}
       <motion.div 
+        id="pricing"
         initial="hidden"
         whileInView="visible"
         viewport={{ once: true }}
         variants={fadeUp}
-        className="w-full max-w-5xl px-4 md:px-6 py-16 md:py-20 border-y border-border"
+        className="w-full max-w-5xl px-4 md:px-6 py-16 md:py-20 border-y border-border scroll-mt-20"
       >
         <div className="text-center mb-12 md:mb-16">
           <h2 className="text-3xl md:text-5xl font-bold mb-4 tracking-tighter">Simple, transparent pricing</h2>
