@@ -13,7 +13,7 @@ export default function StartCoach() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await api.post('/coach/start', { level });
+      const res = await api.post('/english/coach/start', { level });
       router.push(`/coach/${res.data._id}`);
     } catch (err) {
       console.error(err);

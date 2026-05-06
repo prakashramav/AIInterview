@@ -30,6 +30,15 @@ exports.createLesson = async (req, res) => {
     }
 
     const nextSequence = latestLesson ? latestLesson.sequence + 1 : 1;
+    
+    // CACHE CHECK: If this lesson (level + topic + sequence) already exists, reuse it!
+    const existingGlobalLesson = await Lesson.findOne({ level, topic, sequence: nextSequence });
+    if (existingGlobalLesson) {
+      console.log(`[Cache] Reusing existing lesson for ${level} ${topic} #${nextSequence}`);
+      return res.status(200).json(existingGlobalLesson);
+    }
+
+    // Otherwise, generate new content
     const lessonData = await generateLesson(level, topic, nextSequence);
     
     const lesson = new Lesson({
