@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/services/api';
 import Link from 'next/link';
-import { Plus, Clock, CheckCircle2, ChevronRight, Play } from 'lucide-react';
+import { Plus, Clock, CheckCircle2, ChevronRight, Play, MessageSquare } from 'lucide-react';
 
 export default function Dashboard() {
   const [interviews, setInterviews] = useState([]);
@@ -35,10 +35,16 @@ export default function Dashboard() {
           <h1 className="text-3xl font-bold">Dashboard</h1>
           <p className="text-foreground/60 mt-1">Manage your mock interviews and track progress</p>
         </div>
-        <Link href="/interview/start" className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-xl font-medium hover:bg-primary/90 transition-all shadow-md">
-          <Plus size={20} />
-          New Interview
-        </Link>
+        <div className="flex gap-4">
+          <Link href="/coach/start" className="flex items-center gap-2 bg-card border border-border text-foreground px-6 py-3 rounded-xl font-medium hover:bg-foreground/5 transition-all shadow-sm">
+            <MessageSquare size={20} className="text-primary" />
+            English Coach
+          </Link>
+          <Link href="/interview/start" className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-xl font-medium hover:bg-primary/90 transition-all shadow-md">
+            <Plus size={20} />
+            New Interview
+          </Link>
+        </div>
       </div>
 
       {interviews.length === 0 ? (

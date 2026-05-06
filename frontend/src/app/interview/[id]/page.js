@@ -31,15 +31,37 @@ export default function LiveInterviewSession({ params: paramsPromise }) {
   // Avatar Hook
   const { videoUrl, isGenerating, generateVideo } = useAvatar();
 
-  // Inactivity Timer
+  // Inactivity & Nudge Timers
   const inactivityTimerRef = useRef(null);
+  const nudgeTimersRef = useRef([]);
 
   const resetInactivityTimer = () => {
+    // Clear all existing timers
     if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    nudgeTimersRef.current.forEach(timer => clearTimeout(timer));
+    nudgeTimersRef.current = [];
+
+    // Nudge 1: After 30 seconds
+    nudgeTimersRef.current.push(setTimeout(() => {
+      if (!isRecording && !processing) {
+        const nudge = "I didn't get that... are you still there? I'm ready for your answer whenever you are.";
+        speakText(nudge);
+      }
+    }, 30000));
+
+    // Nudge 2: After 75 seconds
+    nudgeTimersRef.current.push(setTimeout(() => {
+      if (!isRecording && !processing) {
+        const nudge = "I'm still waiting for your response. Is everything alright? We can continue our discussion once you're ready.";
+        speakText(nudge);
+      }
+    }, 75000));
+
+    // Final Timeout: After 120 seconds
     inactivityTimerRef.current = setTimeout(() => {
       alert("Interview ended due to 2 minutes of inactivity.");
       handleComplete(true); // Force complete
-    }, 120000); // 2 minutes
+    }, 120000); 
   };
   
   useEffect(() => {
@@ -192,6 +214,8 @@ export default function LiveInterviewSession({ params: paramsPromise }) {
     setCompleting(true);
     
     if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    nudgeTimersRef.current.forEach(timer => clearTimeout(timer));
+    nudgeTimersRef.current = [];
 
     // Stop camera and microphone immediately
     if (stream) {
