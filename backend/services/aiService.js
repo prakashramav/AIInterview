@@ -97,7 +97,7 @@ Now BEGIN the interview immediately. Output ONLY the spoken text.`;
   try {
     const responseText = await generateWithFallback(
       prompt, 
-      ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest']
+      ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash']
     );
     return responseText;
   } catch (error) {
@@ -137,7 +137,7 @@ Format your response as a JSON object:
   try {
     const responseText = await generateWithFallback(
       prompt,
-      ['gemini-2.5-pro', 'gemini-pro-latest', 'gemini-2.0-flash'],
+      ['gemini-1.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash'],
       { generationConfig: { responseMimeType: "application/json" } }
     );
     return JSON.parse(responseText);

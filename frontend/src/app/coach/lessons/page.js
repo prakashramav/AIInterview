@@ -2,12 +2,22 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/services/api';
-import { BookOpen, GraduationCap, Trophy, Play, Star, Plus, Lock, CheckCircle2, Sparkles, Calendar } from 'lucide-react';
+import Cookies from 'js-cookie';
+import { 
+  Lock, 
+  CheckCircle2, 
+  Play, 
+  AlertCircle, 
+  Sparkles, 
+  Calendar,
+  ChevronRight
+} from 'lucide-react';
 
-export default function EnglishProgram() {
+export default function CurriculumPage() {
   const [lessons, setLessons] = useState([]);
-  const [progress, setProgress] = useState([]);
+  const [userProgress, setUserProgress] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -15,149 +25,153 @@ export default function EnglishProgram() {
   }, []);
 
   const fetchData = async () => {
+    const token = Cookies.get('token');
+    if (!token) {
+      router.push(`/auth/login?redirect=/coach/lessons`);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
     try {
       const [lessonsRes, progressRes] = await Promise.all([
         api.get('/english/lessons'),
-        api.get('/english/lessons/progress')
+        api.get('/progress')
       ]);
       setLessons(lessonsRes.data.sort((a, b) => a.day - b.day));
-      setProgress(progressRes.data);
+      setUserProgress(progressRes.data);
     } catch (err) {
-      console.error(err);
+      console.error('Failed to fetch curriculum:', err);
+      setError('Could not load curriculum. Please check your connection.');
     } finally {
       setLoading(false);
     }
   };
 
-  const getDayProgress = (day) => {
-    const lesson = lessons.find(l => l.day === day);
-    if (!lesson) return null;
-    return progress.find(p => p.lessonId?._id === lesson._id || p.lessonId === lesson._id);
-  };
+  if (loading) return <CurriculumSkeleton />;
 
-  const isDayLocked = (day) => {
-    if (day === 1) return false;
-    const prevDayProgress = getDayProgress(day - 1);
-    return !prevDayProgress || (!prevDayProgress.unlockedNext && prevDayProgress.score < 6);
-  };
-
-  const [generatingDay, setGeneratingDay] = useState(null);
-
-  const handleDayClick = async (day, lesson) => {
-    if (isDayLocked(day) || generatingDay) return;
-
-    if (lesson) {
-      router.push(`/coach/lesson/${lesson._id}`);
-    } else {
-      // Auto-generate if missing
-      setGeneratingDay(day);
-      try {
-        const res = await api.post('/english/lessons/generate', { day });
-        router.push(`/coach/lesson/${res.data._id}`);
-      } catch (err) {
-        alert(err.response?.data?.message || "Failed to start lesson");
-        setGeneratingDay(null);
-      }
-    }
-  };
-
-  if (loading) return <div className="flex-1 flex items-center justify-center">Loading Curriculum...</div>;
-
-  return (
-    <div className="flex-1 max-w-7xl mx-auto w-full p-6">
-      {/* ... header remains same ... */}
-      <div className="flex items-center justify-between mb-10">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1">
-              <Sparkles size={12} /> Master Course
-            </span>
-          </div>
-          <h1 className="text-4xl font-black tracking-tight">60-Day AI English Coach</h1>
-          <p className="text-foreground/60 mt-2 text-lg">Your personalized path to professional fluency, one day at a time.</p>
-        </div>
-        
-        <div className="flex items-center gap-6">
-          <div className="text-right">
-             <p className="text-xs font-bold text-foreground/40 uppercase">Your Progress</p>
-             <p className="text-2xl font-black text-primary">{progress.filter(p => p.completed).length} / 60</p>
-          </div>
+  if (error) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+        <div className="glass-card p-10 rounded-[32px] border border-border/50 max-w-md shadow-xl">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-6" />
+          <h2 className="text-2xl font-black mb-2">Couldn't load curriculum</h2>
+          <p className="text-foreground/60 mb-8 font-medium">{error}</p>
           <button 
-            onClick={() => router.push('/coach/start')}
-            className="bg-secondary hover:bg-secondary/80 text-foreground px-6 py-3 rounded-xl font-bold transition-all flex items-center gap-2"
+            onClick={fetchData}
+            className="bg-primary text-primary-foreground px-10 py-3.5 rounded-2xl font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
           >
-            Practice Conversation
+            Try Again
           </button>
         </div>
       </div>
+    );
+  }
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        {Array.from({ length: 60 }).map((_, i) => {
-          const day = i + 1;
-          const lesson = lessons.find(l => l.day === day);
-          const dayProgress = getDayProgress(day);
-          const locked = isDayLocked(day);
-          const completed = dayProgress?.completed;
-          const isGenerating = generatingDay === day;
+  // Group lessons by week (7 days per week)
+  const weeks = [];
+  for (let i = 0; i < lessons.length; i += 7) {
+    weeks.push(lessons.slice(i, i + 7));
+  }
 
-          return (
-            <div 
-              key={day}
-              onClick={() => handleDayClick(day, lesson)}
-              className={`relative aspect-square glass-card rounded-2xl border transition-all flex flex-col p-4 group cursor-pointer ${
-                locked 
-                  ? 'opacity-40 border-border bg-foreground/5 cursor-not-allowed' 
-                  : completed 
-                    ? 'border-green-500/30 bg-green-500/5 hover:border-green-500/50' 
-                    : 'border-primary/20 hover:border-primary shadow-sm hover:shadow-primary/10'
-              } ${isGenerating ? 'animate-pulse' : ''}`}
-            >
-              <div className="flex justify-between items-start mb-2">
-                <span className={`text-[10px] font-black uppercase tracking-tighter ${locked ? 'text-foreground/40' : 'text-primary'}`}>
-                  Day {day}
-                </span>
-                {locked ? (
-                  <Lock size={14} className="text-foreground/20" />
-                ) : isGenerating ? (
-                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                ) : completed ? (
-                  <CheckCircle2 size={16} className="text-green-500" />
-                ) : (
-                  <Play size={14} className="text-primary opacity-0 group-hover:opacity-100 transition-opacity" fill="currentColor" />
-                )}
-              </div>
+  const currentDay = userProgress?.currentDay || 1;
 
-              <div className="flex-1 flex flex-col justify-end">
-                <h3 className={`text-xs font-bold leading-tight line-clamp-2 ${locked ? 'text-foreground/20' : 'text-foreground'}`}>
-                  {isGenerating ? "Generating..." : lesson?.title || `Day ${day} Lesson`}
-                </h3>
-                
-                {!locked && lesson && (
-                  <p className="text-[9px] text-foreground/40 mt-1 uppercase font-bold tracking-widest">{lesson.level}</p>
-                )}
-                
-                {!locked && dayProgress?.score > 0 && (
-                  <div className="flex gap-0.5 mt-2">
-                    {Array.from({ length: 5 }).map((_, si) => (
-                      <Star 
-                        key={si} 
-                        size={8} 
-                        className={dayProgress.score >= (si + 1) * 2 ? "text-yellow-500 fill-yellow-500" : "text-foreground/10"} 
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-              
-              {/* Progress Bar for the day if active */}
-              {!locked && !completed && (
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary/20 rounded-b-2xl overflow-hidden">
-                  <div className="h-full bg-primary w-1/3" />
-                </div>
-              )}
+  return (
+    <div className="flex-1 max-w-6xl mx-auto w-full p-4 md:p-8">
+      <div className="mb-12">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-1">
+            <Sparkles size={12} /> Full Course
+          </span>
+        </div>
+        <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4">The 60-Day <span className="text-primary">Fluency</span> Path</h1>
+        <p className="text-foreground/60 text-lg max-w-2xl font-medium leading-relaxed">
+          Master professional English with our structured daily curriculum. Each day builds upon the previous one.
+        </p>
+      </div>
+
+      <div className="space-y-16">
+        {weeks.map((weekLessons, weekIdx) => (
+          <div key={weekIdx} className="space-y-6">
+            <div className="flex items-center gap-4">
+              <h2 className="text-2xl font-black whitespace-nowrap">Week {weekIdx + 1}</h2>
+              <div className="h-px bg-border w-full" />
             </div>
-          );
-        })}
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {weekLessons.map((lesson) => {
+                const isLocked = lesson.day > currentDay;
+                const isCompleted = userProgress?.lessonsCompleted?.some(l => l.lessonId === lesson._id);
+                
+                return (
+                  <div 
+                    key={lesson._id}
+                    onClick={() => !isLocked && router.push(`/coach/lesson/${lesson._id}`)}
+                    className={`group relative glass-card p-6 rounded-[28px] border transition-all flex flex-col h-full ${
+                      isLocked 
+                        ? 'opacity-50 border-border bg-foreground/5 cursor-not-allowed grayscale' 
+                        : 'border-border/50 hover:border-primary hover:shadow-xl hover:shadow-primary/10 cursor-pointer'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${isLocked ? 'text-foreground/40' : 'text-primary'}`}>
+                        Day {lesson.day}
+                      </span>
+                      {isLocked ? (
+                        <div className="p-2 bg-foreground/5 rounded-lg">
+                          <Lock size={14} className="text-foreground/20" />
+                        </div>
+                      ) : isCompleted ? (
+                        <div className="p-2 bg-green-500/10 rounded-lg">
+                          <CheckCircle2 size={16} className="text-green-500" />
+                        </div>
+                      ) : (
+                        <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                          <Play size={14} fill="currentColor" />
+                        </div>
+                      )}
+                    </div>
+
+                    <h3 className={`font-black text-lg leading-tight mb-2 ${isLocked ? 'text-foreground/40' : 'text-foreground'}`}>
+                      {lesson.title}
+                    </h3>
+                    <p className={`text-xs font-bold uppercase tracking-wider mb-4 ${isLocked ? 'text-foreground/20' : 'text-foreground/40'}`}>
+                      {lesson.topic} • {lesson.level}
+                    </p>
+
+                    <div className="mt-auto pt-4 border-t border-border/50 flex items-center justify-between">
+                      <span className="text-[10px] font-black text-foreground/30 uppercase tracking-widest">
+                        {isCompleted ? 'Completed' : isLocked ? 'Locked' : 'Ready to Start'}
+                      </span>
+                      {!isLocked && <ChevronRight size={14} className="text-primary group-hover:translate-x-1 transition-transform" />}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CurriculumSkeleton() {
+  return (
+    <div className="flex-1 max-w-6xl mx-auto w-full p-4 md:p-8 animate-pulse">
+      <div className="mb-12">
+        <div className="h-6 w-32 bg-foreground/10 rounded-full mb-4" />
+        <div className="h-12 w-96 bg-foreground/10 rounded-xl mb-4" />
+        <div className="h-6 w-128 bg-foreground/5 rounded-lg" />
+      </div>
+
+      <div className="space-y-12">
+        <div className="h-8 w-40 bg-foreground/10 rounded-lg" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-48 bg-foreground/5 rounded-[28px] border border-border/50" />
+          ))}
+        </div>
       </div>
     </div>
   );

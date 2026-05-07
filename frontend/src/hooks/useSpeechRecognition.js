@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 export default function useSpeechRecognition() {
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [error, setError] = useState(null);
   const recognitionRef = useRef(null);
 
   useEffect(() => {
@@ -23,6 +24,11 @@ export default function useSpeechRecognition() {
 
         recognitionRef.current.onerror = (event) => {
           console.error('Speech recognition error', event.error);
+          if (event.error === 'not-allowed') {
+            setError('Microphone access denied. Please enable it in your browser settings.');
+          } else {
+            setError(event.error);
+          }
           setIsRecording(false);
         };
         

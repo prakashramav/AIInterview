@@ -15,6 +15,12 @@ const coachSessionSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Lesson'
   },
+  lessonTopic: String,
+  currentDay: {
+    type: Number,
+    default: 1
+  },
+  recentErrors: [String],
   currentStep: {
     type: Number,
     default: 1 // 1-12 as per the new interactive flow

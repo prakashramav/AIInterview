@@ -1,6 +1,17 @@
 const express = require('express');
-const { getLessons, getLessonByDay, createLesson, getUserProgress, updateProgress } = require('../controllers/lessonController');
-const { startCoachSession, processUserMessageStream, getCoachSession, getUserSessions } = require('../controllers/coachController');
+const { 
+  getLessons, 
+  getLessonByDay, 
+  createLesson, 
+  getUserProgress, 
+  updateProgress 
+} = require('../controllers/lessonController');
+const { 
+  startCoachSession, 
+  processUserMessage, 
+  getCoachSession, 
+  getUserSessions 
+} = require('../controllers/coachController');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
@@ -18,7 +29,7 @@ router.post('/lessons/progress', auth, updateProgress);
  * COACHING SESSION ROUTES
  */
 router.post('/coach/start', auth, startCoachSession);
-router.post('/coach/message-stream', auth, processUserMessageStream);
+router.post('/coach/message', auth, processUserMessage);
 router.get('/coach/sessions', auth, getUserSessions);
 router.get('/coach/:id', auth, getCoachSession);
 

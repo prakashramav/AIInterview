@@ -1,123 +1,127 @@
 const CoachSession = require('../models/CoachSession');
-const { generateCoachResponseStream, analyzeSentence, generateOpeningQuestion } = require('../services/coachService');
+const Progress = require('../models/Progress');
+const User = require('../models/User');
+const { buildCoachSystemPrompt } = require('../services/coachPromptBuilder');
+const { extractErrors } = require('../services/errorTracker');
+const { shouldAdvanceStep } = require('../services/stepManager');
+const { filterCoachResponse } = require('../services/coachResponseFilter');
+const { getInterviewResponse } = require('../services/aiClient'); // Reusing the primary AI client
 
+/**
+ * Starts or resumes a coach session for the user.
+ */
 exports.startCoachSession = async (req, res) => {
   try {
-    const { level } = req.body;
-    const firstQuestion = await generateOpeningQuestion(level || 'Beginner');
+    const user = await User.findById(req.user.userId);
+    let progress = await Progress.findOne({ userId: req.user.userId });
+    
+    if (!progress) {
+      progress = new Progress({ userId: req.user.userId });
+      await progress.save();
+    }
 
-    const session = new CoachSession({
-      userId: req.user.userId,
-      level: level || 'Beginner',
-      messages: [{
-        role: 'ai',
-        content: firstQuestion
-      }]
+    const currentDay = progress.currentDay;
+    
+    // Check for existing session for today
+    let session = await CoachSession.findOne({ 
+      userId: req.user.userId, 
+      currentDay: currentDay,
+      status: 'active'
     });
-    await session.save();
+
+    if (!session) {
+      session = new CoachSession({
+        userId: req.user.userId,
+        userName: user.name,
+        currentDay: currentDay,
+        currentStep: 1,
+        lessonTopic: `Day ${currentDay}: Practical Communication`, // Placeholder, can be mapped from a curriculum
+        level: 'Intermediate', // Default or fetch from user profile
+        messages: [],
+        recentErrors: []
+      });
+      
+      // Generate opening
+      const systemPrompt = buildCoachSystemPrompt(session);
+      const opening = await getInterviewResponse(systemPrompt, [], "START_COACH_SESSION", { temperature: 0.82, maxOutputTokens: 280 });
+      const filteredOpening = filterCoachResponse(opening, [], session);
+      
+      session.messages.push({ role: 'ai', content: filteredOpening });
+      await session.save();
+    }
+
     res.status(201).json(session);
   } catch (error) {
+    console.error('[COACH_START]', error);
     res.status(500).json({ message: error.message });
   }
 };
 
-exports.processUserMessageStream = async (req, res) => {
+/**
+ * Processes a user message and returns Priya's filtered response.
+ */
+exports.processUserMessage = async (req, res) => {
   try {
-    const { sessionId, message, context, level } = req.body;
-    let session = null;
-    let effectiveLevel = level || 'Beginner';
-    let history = [];
+    const { sessionId, message } = req.body;
+    const session = await CoachSession.findById(sessionId);
+    if (!session) return res.status(404).json({ message: "Session not found" });
 
-    if (sessionId) {
-      session = await CoachSession.findById(sessionId);
-      if (!session) return res.status(404).json({ message: "Session not found" });
-      effectiveLevel = session.level;
-      history = session.messages;
-    } else if (context) {
-      // Practice mode from LessonDetail - use transient history
-      history = [
-        { role: 'ai', content: "Lesson context initialized." },
-        { role: 'user', content: `Context: ${context}` }
-      ];
+    // 1. Extract errors from user message
+    const errors = await extractErrors(message);
+    if (errors.length > 0) {
+      session.recentErrors = [...new Set([...session.recentErrors, ...errors])].slice(-5);
     }
 
-    // 1. Analyze the user's sentence for grammar
-    const analysis = await analyzeSentence(message, effectiveLevel);
-    
-    if (session) {
-      session.messages.push({
-        role: 'user',
-        content: message,
-        correction: analysis.isCorrect ? null : analysis.corrected,
-        explanation: analysis.isCorrect ? null : analysis.explanation
-      });
-    }
+    // 2. Build prompt
+    const systemPrompt = buildCoachSystemPrompt(session);
 
-    // 2. Prepare for streaming response
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
+    // 3. Get AI response
+    const rawResponse = await getInterviewResponse(systemPrompt, session.messages, message, { temperature: 0.82, maxOutputTokens: 280 });
 
-    // Send the analysis first so the frontend can display it
-    res.write(`data: ${JSON.stringify({ analysis })}\n\n`);
+    // 4. Filter response
+    const recentAiResponses = session.messages.filter(m => m.role === 'ai').map(m => m.content);
+    const filteredResponse = filterCoachResponse(rawResponse, recentAiResponses, session);
 
-    // 3. Generate Coach's reply
-    // Pass currentStep and lesson context
-    const lessonContext = session?.lessonId?.topic || context || "General Conversation";
-    const currentStep = session?.currentStep || 1;
+    // 5. Update session
+    session.messages.push({ role: 'user', content: message });
+    session.messages.push({ role: 'ai', content: filteredResponse });
 
-    const stream = await generateCoachResponseStream(effectiveLevel, [...history, { role: 'user', content: message }], currentStep, lessonContext);
-    
-    let fullContent = "";
-    for await (const chunk of stream) {
-      const text = chunk.text();
-      fullContent += text;
-      // We still stream the raw text (which is JSON) for now, 
-      // or we can try to extract the message field if we want to stream audio.
-      res.write(`data: ${JSON.stringify({ chunk: text })}\n\n`);
-    }
-
-    // Parse the final JSON from AI
-    try {
-      const jsonStr = fullContent.match(/\{.*\}/s)?.[0] || fullContent;
-      const aiResponse = JSON.parse(jsonStr);
-
-      if (session) {
-        session.messages.push({ role: 'ai', content: aiResponse.message });
-        session.currentStep = aiResponse.nextStep || (session.currentStep + 1);
-        if (aiResponse.lessonCompleted) session.status = 'completed';
+    // 6. Check step advancement
+    const advanced = shouldAdvanceStep(filteredResponse);
+    if (advanced) {
+      session.currentStep += 1;
+      
+      // If day complete
+      if (session.currentStep > 12) {
+        session.status = 'completed';
         
-        // If there's a score in the evaluation, update progress
-        if (aiResponse.evaluation?.score) {
-          session.progress.fluency = (session.progress.fluency + aiResponse.evaluation.score) / 2;
+        // Update global progress
+        const progress = await Progress.findOne({ userId: req.user.userId });
+        if (progress) {
+          progress.currentDay += 1;
+          progress.lessonsCompleted.push({
+            lessonId: `day-${session.currentDay}`,
+            title: session.lessonTopic,
+            fluencyScore: 85 // Mock score or calculated
+          });
+          await progress.save();
         }
-        await session.save();
       }
-
-      res.write(`data: ${JSON.stringify({ 
-        done: true, 
-        message: aiResponse.message,
-        waitForUser: aiResponse.waitForUser,
-        evaluation: aiResponse.evaluation,
-        nextStep: aiResponse.nextStep,
-        lessonCompleted: aiResponse.lessonCompleted
-      })}\n\n`);
-    } catch (parseError) {
-      console.error("[AI Coach] JSON Parse Error:", parseError, fullContent);
-      res.write(`data: ${JSON.stringify({ done: true, message: fullContent })}\n\n`);
     }
-    
-    res.end();
+
+    await session.save();
+
+    res.json({
+      response: filteredResponse,
+      currentStep: session.currentStep,
+      currentDay: session.currentDay,
+      errors: session.recentErrors.slice(-3),
+      lessonCompleted: session.status === 'completed'
+    });
 
   } catch (error) {
-    console.error("Coach stream error:", error);
-    if (!res.headersSent) {
-      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
-      res.end();
-    } else {
-      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
-      res.end();
-    }
+    console.error('[COACH_MESSAGE]', error);
+    res.status(500).json({ message: error.message });
   }
 };
 
