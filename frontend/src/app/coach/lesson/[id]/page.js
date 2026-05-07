@@ -98,6 +98,16 @@ export default function LessonDetail({ params: paramsPromise }) {
                 practiced: true
               });
 
+              // Update dashboard progress and streak
+              await api.patch('/progress', {
+                currentDay: lesson.day + 1,
+                lesson: {
+                  lessonId: lesson._id,
+                  title: lesson.title,
+                  fluencyScore: data.analysis?.fluencyScore || 0
+                }
+              });
+
               if (progressRes.data.thresholdMet) {
                 alert("🎉 Great job! You've mastered this concept. Let's move to the next lesson!");
               }

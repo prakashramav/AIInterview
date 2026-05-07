@@ -1,19 +1,20 @@
 const express = require('express');
-const multer = require('multer');
-const { startInterview, answerQuestion, answerQuestionStream, getInterview, getInterviews, completeInterview } = require('../controllers/interviewController');
-const { generateAvatar, checkAvatarStatus } = require('../controllers/avatarController');
+const { 
+  startInterview, 
+  endInterview, 
+  getInterviewReport, 
+  getInterviews, 
+  getInterview 
+} = require('../controllers/interviewController');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
-const upload = multer({ dest: 'uploads/' });
 
 router.post('/start', auth, startInterview);
-router.post('/answer', auth, upload.single('audio'), answerQuestion);
-router.post('/answer-stream', auth, answerQuestionStream);
-router.post('/avatar/generate', auth, generateAvatar);
-router.get('/avatar/status/:id', auth, checkAvatarStatus);
-router.post('/:id/complete', auth, completeInterview);
-router.get('/:id', auth, getInterview);
+router.post('/end', auth, endInterview);
+router.get('/report/:sessionId', auth, getInterviewReport);
 router.get('/', auth, getInterviews);
+router.get('/sessions', auth, getInterviews);
+router.get('/:id', auth, getInterview);
 
 module.exports = router;

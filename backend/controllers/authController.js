@@ -36,3 +36,29 @@ exports.login = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+exports.getMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).select('-password');
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // In a real app, you'd generate a token and send an email
+    // For this demo, we'll just log it
+    console.log(`[AUTH] Password reset requested for: ${email}`);
+    res.json({ message: 'Check your inbox for reset instructions' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Google Auth logic removed

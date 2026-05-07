@@ -18,7 +18,11 @@ export default function useMediaStream() {
         }
       } catch (err) {
         console.error("Error accessing media devices.", err);
-        setError("Could not access camera or microphone. Please allow permissions.");
+        if (err.name === 'NotAllowedError') {
+          setError("Permission denied. Please click the camera icon in your browser's address bar to allow access and refresh the page.");
+        } else {
+          setError("Could not access camera or microphone. Please check your hardware connections.");
+        }
       }
     }
 

@@ -14,8 +14,8 @@ export default function StartInterview() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await api.post('/interview/start', { jobRole, experienceLevel });
-      router.push(`/interview/${res.data._id}`);
+      const res = await api.post('/interview/start', { topic: jobRole, experienceLevel });
+      router.push(`/interview/${res.data.sessionId}`);
     } catch (err) {
       console.error(err);
       alert('Failed to start interview');

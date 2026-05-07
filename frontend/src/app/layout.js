@@ -13,8 +13,20 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "InterviewAI - AI-Powered Mock Interviews",
-  description: "Practice your interview skills with an adaptive AI interviewer.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
+  title: "InterviewAI - Master Technical Interviews & English Fluency",
+  description: "The all-in-one platform to land your dream job. Adaptive technical interviews combined with a 60-Day AI English Communication Program.",
+  openGraph: {
+    title: "InterviewAI - AI-Powered Mock Interviews",
+    description: "Practice your interview skills with an adaptive AI interviewer.",
+    images: ["/og-image.png"], // Placeholder path
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "InterviewAI - AI-Powered Mock Interviews",
+    description: "Practice your interview skills with an adaptive AI interviewer.",
+  },
 };
 
 export default function RootLayout({ children }) {
